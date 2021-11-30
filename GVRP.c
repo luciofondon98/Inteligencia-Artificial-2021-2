@@ -119,7 +119,7 @@ void mostrarInfoNodos(nodo* infoNodes, int tamArray) {
     printf("%d\n", tamArray);
 }
 
-double haversineDist(double th1, double ph1, double th2, double ph2) { // longitud1 latitud1 longitud2 latitud2 
+double haversineDist(double th1, double ph1, double th2, double ph2) { // latitud1 longitud1 latitud2 longitud2
 	double dx, dy, dz;
 	ph1 -= ph2;
 	ph1 *= TO_RAD, th1 *= TO_RAD, th2 *= TO_RAD;
@@ -139,6 +139,11 @@ int main() {
     mostrarParametros(parametros);
     nodo* infoNodes = getInfoNodo(fp, parametros->numCostumers, parametros->numStations);
     mostrarInfoNodos(infoNodes, tamArray);
+
+    double d = haversineDist(infoNodes[0].latitude, infoNodes[0].longitude, infoNodes[1].latitude, infoNodes[1].longitude);
+
+    printf("Distancia de Haversine: en km -> %.5f, en millas -> %.5f\n", d, d / 1.609344);
+
     fclose(fp);
     free(parametros);
     return 0;

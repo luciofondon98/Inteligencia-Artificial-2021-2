@@ -1,6 +1,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
+
+
+#define R 6729.56122941 // radio en metros, que son 4182.44949 millas (4182.44949 * 1.609)
+#define TO_RAD (3.1415926536 / 180)
 
 int tamArray; // variable global para mantener el tamaño del arreglo
 
@@ -30,10 +35,6 @@ nodo* getInfoNodo(FILE* fp, int numCostumers, int numStations) { // funcion que 
     // creamos arreglo de nodos que almacenara la info
     int totalNodes = numCostumers + numStations; // +1 por el depot
     nodo* infoNodes = (nodo*)malloc(sizeof(nodo) * totalNodes);
-    // while(fgets(linea, sizeof(linea), fp)){
-    //     printf("%s", linea);
-
-    // }
 
     tamArray = totalNodes;
 
@@ -116,6 +117,17 @@ void mostrarInfoNodos(nodo* infoNodes, int tamArray) {
             infoNodes[i].longitude,infoNodes[i].latitude);
     }
     printf("%d\n", tamArray);
+}
+
+double haversineDist(double th1, double ph1, double th2, double ph2) { // longitud1 latitud1 longitud2 latitud2 
+	double dx, dy, dz;
+	ph1 -= ph2;
+	ph1 *= TO_RAD, th1 *= TO_RAD, th2 *= TO_RAD;
+ 
+	dz = sin(th1) - sin(th2);
+	dx = cos(ph1) * cos(th1) - cos(th2);
+	dy = sin(ph1) * cos(th1);
+	return asin(sqrt(dx * dx + dy * dy + dz * dz) / 2) * 2 * R;
 }
 
 int main() {

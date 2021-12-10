@@ -7,7 +7,8 @@
 #define R 6729.56122941 // radio en metros, que son 4182.44949 millas (4182.44949 * 1.609)
 #define TO_RAD (3.1415926536 / 180)
 
-int tamArray; // variable global para mantener el tamaño del arreglo
+int tamCostumers; // variable global para mantener el tamaño del arreglo
+int tamStations; // variable global para mantener el tamaño del arreglo
 
 typedef struct instanceParams { // estructura que contiene los parametros de la instancia
     int numCostumers;
@@ -28,27 +29,23 @@ typedef struct nodo {
 } nodo;
 
 
-
-nodo* getInfoNodo(FILE* fp, int numCostumers, int numStations) { // funcion que retorna un struct nodo con la informacion del nodo
+nodo* getInfoStations(FILE* fp, int numStations) { // funcion que retorna un struct nodo con la informacion del nodo
     char linea[1000];
 
     // creamos arreglo de nodos que almacenara la info
-    int totalNodes = numCostumers + numStations; // +1 por el depot
-    nodo* infoNodes = (nodo*)malloc(sizeof(nodo) * totalNodes);
-
-    tamArray = totalNodes;
+    nodo* infoStations = (nodo*)malloc(sizeof(nodo) * numStations);
 
     fgets(linea, sizeof(linea), fp); // obtenemos la info del nodo deposito
     if (linea[0] == ' ') { 
         sscanf(linea," %d  %c     %lf   %lf",
-        &(infoNodes[0].nodeId),&(infoNodes[0].nodeType),&(infoNodes[0].longitude),
-        &(infoNodes[0].latitude));
+        &(infoStations[0].nodeId),&(infoStations[0].nodeType),&(infoStations[0].longitude),
+        &(infoStations[0].latitude));
     }
 
     else {
         sscanf(linea,"%d  %c     %lf   %lf",
-        &(infoNodes[0].nodeId),&(infoNodes[0].nodeType),&(infoNodes[0].longitude),
-        &(infoNodes[0].latitude));
+        &(infoStations[0].nodeId),&(infoStations[0].nodeType),&(infoStations[0].longitude),
+        &(infoStations[0].latitude));
     }
     fgets(linea, sizeof(linea), fp); // dummy para leer una linea mas
 
@@ -56,27 +53,74 @@ nodo* getInfoNodo(FILE* fp, int numCostumers, int numStations) { // funcion que 
     // infoNodes[0].nodeId, infoNodes[0].nodeType, 
     // infoNodes[0].longitude,infoNodes[0].latitude);
 
-    for (size_t i = 1; i < totalNodes; i++) {
+    for (size_t i = 1; i < numStations; i++) {
         fgets(linea, sizeof(linea), fp); // dummy para leer una linea mas
         if (linea[0] == ' ') { 
             sscanf(linea," %d  %c     %lf   %lf",
-            &(infoNodes[i].nodeId),&(infoNodes[i].nodeType),&(infoNodes[i].longitude),
-            &(infoNodes[i].latitude));
+            &(infoStations[i].nodeId),&(infoStations[i].nodeType),&(infoStations[i].longitude),
+            &(infoStations[i].latitude));
         }
 
         else {
             sscanf(linea,"%d  %c     %lf   %lf",
-            &(infoNodes[i].nodeId),&(infoNodes[i].nodeType),&(infoNodes[i].longitude),
-            &(infoNodes[i].latitude));
+            &(infoStations[i].nodeId),&(infoStations[i].nodeType),&(infoStations[i].longitude),
+            &(infoStations[i].latitude));
         }
         // printf("%d %c %lf %lf\n",
         // infoNodes[i].nodeId, infoNodes[i].nodeType, 
         // infoNodes[i].longitude,infoNodes[i].latitude);
     }
 
-    return infoNodes;
+    return infoStations;
     // printf("%ld\n", strlen(linea));
+}
 
+
+
+nodo* getInfoCostumers(FILE* fp, int numCostumers) { // funcion que retorna un struct nodo con la informacion del nodo
+    char linea[1000];
+
+    // creamos arreglo de nodos que almacenara la info
+    nodo* infoCostumers = (nodo*)malloc(sizeof(nodo) * numCostumers);
+
+    fgets(linea, sizeof(linea), fp); // obtenemos la info del nodo deposito
+    if (linea[0] == ' ') { 
+        sscanf(linea," %d  %c     %lf   %lf",
+        &(infoCostumers[0].nodeId),&(infoCostumers[0].nodeType),&(infoCostumers[0].longitude),
+        &(infoCostumers[0].latitude));
+    }
+
+    else {
+        sscanf(linea,"%d  %c     %lf   %lf",
+        &(infoCostumers[0].nodeId),&(infoCostumers[0].nodeType),&(infoCostumers[0].longitude),
+        &(infoCostumers[0].latitude));
+    }
+    // fgets(linea, sizeof(linea), fp); // dummy para leer una linea mas
+
+    // printf("%d %c %lf %lf",
+    // infoNodes[0].nodeId, infoNodes[0].nodeType, 
+    // infoNodes[0].longitude,infoNodes[0].latitude);
+
+    for (size_t i = 1; i < numCostumers; i++) {
+        fgets(linea, sizeof(linea), fp); // dummy para leer una linea mas
+        if (linea[0] == ' ') { 
+            sscanf(linea," %d  %c     %lf   %lf",
+            &(infoCostumers[i].nodeId),&(infoCostumers[i].nodeType),&(infoCostumers[i].longitude),
+            &(infoCostumers[i].latitude));
+        }
+
+        else {
+            sscanf(linea,"%d  %c     %lf   %lf",
+            &(infoCostumers[i].nodeId),&(infoCostumers[i].nodeType),&(infoCostumers[i].longitude),
+            &(infoCostumers[i].latitude));
+        }
+        // printf("%d %c %lf %lf\n",
+        // infoNodes[i].nodeId, infoNodes[i].nodeType, 
+        // infoNodes[i].longitude,infoNodes[i].latitude);
+    }
+
+    return infoCostumers;
+    // printf("%ld\n", strlen(linea));
 }
 
 instanceParams* getParametros(FILE* fp) { // funcion que retorna un struct con los parametros almacenados
@@ -104,7 +148,7 @@ instanceParams* getParametros(FILE* fp) { // funcion que retorna un struct con l
 }
 
 void mostrarParametros(instanceParams* parametros) {
-    printf(" Número de clientes: %d\n Número de estaciones: %d\n Tiempo máximo de recorrido: %d\n Distancia máxima de recorrido: %d\n Velocidad límite: %lf\n Tiempo de servicio: %d\n Tiempo de recarga: %d\n",
+    printf(" Número de clientes: %d\n Número de estaciones: %d\n Tiempo máximo de recorrido (minutos): %d\n Distancia máxima de recorrido (millas): %d\n Velocidad límite (millas/min): %lf\n Tiempo de servicio (minutos): %d\n Tiempo de recarga (min): %d\n",
     parametros->numCostumers, parametros->numStations, 
     parametros->maxTime,parametros->maxDistance,parametros->vehicleSpeed,
     parametros->serviceTime, parametros->refuelTime);
@@ -137,14 +181,17 @@ int main() {
     
     parametros = getParametros(fp);
     mostrarParametros(parametros);
-    nodo* infoNodes = getInfoNodo(fp, parametros->numCostumers, parametros->numStations);
-    mostrarInfoNodos(infoNodes, tamArray);
+    
+    nodo* infoStations = getInfoStations(fp, parametros->numStations);
+    nodo* infoCostumers = getInfoCostumers(fp, parametros->numCostumers);
 
-    double d = haversineDist(infoNodes[0].latitude, infoNodes[0].longitude, infoNodes[1].latitude, infoNodes[1].longitude);
-
-    printf("Distancia de Haversine: en km -> %.5f, en millas -> %.5f\n", d, d / 1.609344);
+    mostrarInfoNodos(infoStations, parametros->numStations);
+    mostrarInfoNodos(infoCostumers, parametros->numCostumers);
+    // printf("Distancia de Haversine: en km -> %.5f, en millas -> %.5f\n", d, d / 1.609344);
 
     fclose(fp);
     free(parametros);
+    // para compilar: gcc GVRP.c -o a -Wall -lm (-lm por <math.h>)
+    
     return 0;
 }

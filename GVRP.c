@@ -3,12 +3,16 @@
 #include <string.h>
 #include <math.h>
 
-
 #define R 6729.56122941 // radio en metros, que son 4182.44949 millas (4182.44949 * 1.609)
 #define TO_RAD (3.1415926536 / 180)
 
 int tamCostumers; // variable global para mantener el tamaño del arreglo
 int tamStations; // variable global para mantener el tamaño del arreglo
+
+// ---------------------------------------------------------------------------------------- //
+
+
+// --------------------/* Structs para almacenar los datos */------------------------ //
 
 typedef struct instanceParams { // estructura que contiene los parametros de la instancia
     int numCostumers;
@@ -28,6 +32,20 @@ typedef struct nodo {
     int visited;
 } nodo;
 
+typedef struct solucionNode {
+    char* nombreNodo;  // -> nombre del nodo (ya sea estacion-numero o cliente-numero) que es parte de la solución
+    struct solucionNode* sig; 
+} solucionNode;
+
+typedef struct solucionList { // estructura que contiene 
+    int size; // tamaño de la lista
+    solucionNode* head;
+} solucionList;
+
+// ---------------------------------------------------------------------------------------- //
+
+           
+// ---------------- /* Funciones para agarrar los parámetros y datos de las instancias */----- //
 
 nodo* getInfoStations(FILE* fp, int numStations) { // funcion que retorna un struct nodo con la informacion del nodo
     char linea[1000];
@@ -74,8 +92,6 @@ nodo* getInfoStations(FILE* fp, int numStations) { // funcion que retorna un str
     return infoStations;
     // printf("%ld\n", strlen(linea));
 }
-
-
 
 nodo* getInfoCostumers(FILE* fp, int numCostumers) { // funcion que retorna un struct nodo con la informacion del nodo
     char linea[1000];
@@ -147,6 +163,11 @@ instanceParams* getParametros(FILE* fp) { // funcion que retorna un struct con l
     return parametros;
 }
 
+// ---------------------------------------------------------------------------------------- //
+
+
+// ---------------- /* Funciones para mostrar los parámetros y datos de las instancias */----- //
+
 void mostrarParametros(instanceParams* parametros) {
     printf(" Número de clientes: %d\n Número de estaciones: %d\n Tiempo máximo de recorrido (minutos): %d\n Distancia máxima de recorrido (millas): %d\n Velocidad límite (millas/min): %lf\n Tiempo de servicio (minutos): %d\n Tiempo de recarga (min): %d\n",
     parametros->numCostumers, parametros->numStations, 
@@ -163,6 +184,43 @@ void mostrarInfoNodos(nodo* infoNodes, int tamArray) {
     printf("%d\n", tamArray);
 }
 
+// ---------------------------------------------------------------------------------------- //
+
+
+// ---------------- /* Funciones asociadas a la lista enlazada de la solución */----- //
+
+solucionList *crearLista(){
+    solucionList *lista = (solucionList*)malloc(sizeof(solucionList));
+    lista->size = 0;
+    lista->head = NULL;
+    return lista;
+}
+
+solucionNode* crearNodo(char* nombreNodo){
+    solucionNode* nodo = (solucionNode*)malloc(sizeof(solucionNode));
+    nodo->sig = NULL;
+    nodo->nombreNodo = nombreNodo;
+      // allocate memory to hold word
+    // nodo->nombreNodo = malloc(strlen(nombreNodo) + 1);
+    // copy the current word
+    // strcpy(nodo->nombreNodo, nombreNodo);
+    return nodo;
+}
+
+void insertarNodo(solucionList *Lista, char* nombreNodo){ //agrega al final de la lista
+    if(Lista->head == NULL) Lista->head = crearNodo(nombreNodo);
+    else{
+        solucionNode *current = Lista->head;
+        while (current->sig != NULL) current = current->sig;
+        solucionNode *nuevo = crearNodo(nombreNodo);
+        current->sig = nuevo; 
+    }
+    Lista->size++;    
+}
+
+// ---------------------------------------------------------------------------------------- //
+
+
 double haversineDist(double th1, double ph1, double th2, double ph2) { // latitud1 longitud1 latitud2 longitud2
 	double dx, dy, dz;
 	ph1 -= ph2;
@@ -172,6 +230,12 @@ double haversineDist(double th1, double ph1, double th2, double ph2) { // latitu
 	dx = cos(ph1) * cos(th1) - cos(th2);
 	dy = sin(ph1) * cos(th1);
 	return asin(sqrt(dx * dx + dy * dy + dz * dz) / 2) * 2 * R;
+}
+
+void greedyGVRP(solucionList* listaSolucion/*, nodo* infoCostumers, nodo* infoStations, int maxTime, int maxDistance, double vehicleSpeed, int serviceTimem, int refuelTime*/) {
+    // se pasa primero como parámetro una lista vacía, entonces añadimos d0 por ser el nodo depósito inicial 
+    insertarNodo(listaSolucion, "d0");
+    // 
 }
 
 int main() {
@@ -185,13 +249,18 @@ int main() {
     nodo* infoStations = getInfoStations(fp, parametros->numStations);
     nodo* infoCostumers = getInfoCostumers(fp, parametros->numCostumers);
 
-    mostrarInfoNodos(infoStations, parametros->numStations);
-    mostrarInfoNodos(infoCostumers, parametros->numCostumers);
+    // mostrarInfoNodos(infoStations, parametros->numStations);
+    // mostrarInfoNodos(infoCostumers, parametros->numCostumers);
     // printf("Distancia de Haversine: en km -> %.5f, en millas -> %.5f\n", d, d / 1.609344);
+
+    solucionList* listaSolucion = crearLista();
+    greedyGVRP(listaSolucion);
+    printf("El tamaño inicial de la lista es de: %d\n", listaSolucion->size);
+    printf("Nodo inicial: %s\n", listaSolucion->head->nombreNodo);
 
     fclose(fp);
     free(parametros);
-    // para compilar: gcc GVRP.c -o a -Wall -lm (-lm por <math.h>)
+    // para compilar: gcc GVRP.c -o a -Wall -lm (-lm por <math.h>), luego valgrind ./a
     
     return 0;
 }

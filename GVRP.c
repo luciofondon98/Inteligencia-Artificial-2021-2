@@ -8,7 +8,8 @@
 
 int tamCostumers; // variable global para mantener el tamaño del arreglo
 int tamStations; // variable global para mantener el tamaño del arreglo
-
+double latitudDeposito;
+double longitudDeposito;
 // ---------------------------------------------------------------------------------------- //
 
 
@@ -33,7 +34,7 @@ typedef struct nodo {
 } nodo;
 
 typedef struct solucionNode {
-    char* nombreNodo;  // -> nombre del nodo (ya sea estacion-numero o cliente-numero) que es parte de la solución
+    char nombreNodo[3];  // -> nombre del nodo (ya sea estacion-numero o cliente-numero) que es parte de la solución
     struct solucionNode* sig; 
 } solucionNode;
 
@@ -205,11 +206,7 @@ solucionList *crearLista(){
 solucionNode* crearNodo(char* nombreNodo){
     solucionNode* nodo = (solucionNode*)malloc(sizeof(solucionNode));
     nodo->sig = NULL;
-    nodo->nombreNodo = nombreNodo;
-      // allocate memory to hold word
-    // nodo->nombreNodo = malloc(strlen(nombreNodo) + 1);
-    // copy the current word
-    // strcpy(nodo->nombreNodo, nombreNodo);
+    strcpy(nodo->nombreNodo, nombreNodo); //Lo que hay en apellido se copia a nombre
     return nodo;
 }
 
@@ -222,6 +219,20 @@ void insertarNodo(solucionList *Lista, char* nombreNodo){ //agrega al final de l
         current->sig = nuevo; 
     }
     Lista->size++;    
+}
+
+void mostrarLista(solucionList *Lista){
+    if(Lista->head==NULL) printf("[ ]\n");
+    else{
+        // printf("[");
+      	solucionNode* current = Lista->head;
+ 		while (current != NULL){
+ 			printf(" %s ",current->nombreNodo);
+ 			current = current->sig;
+ 		}
+        printf("]");
+        printf("\n");
+    }
 }
 
 // ---------------------------------------------------------------------------------------- //
@@ -238,15 +249,15 @@ double haversineDist(double th1, double ph1, double th2, double ph2) { // latitu
 	return asin(sqrt(dx * dx + dy * dy + dz * dz) / 2) * 2 * R;
 }
 
-structNodoMenorDistancia clienteConMenorDistanciaA(nodo deNodo, nodo* infoCostumers) {
+structNodoMenorDistancia clienteConMenorDistanciaA(nodo aNodo, nodo* infoCostumers) {
     // Primero, visitaremos todos los clientes y veremos cual es el cliente no visitado con la menor distancia posible
     int indiceMenorDistancia;
     nodo nodoMenorDistancia;
-    double d = 99999999; // inicializamos en una distancia muy grande 
+    double d = 99999999.0; // inicializamos en una distancia muy grande 
     // Iteramos sobre los clientes
     for (size_t i = 0; i < tamCostumers; i++) {
-        double distTemp = haversineDist(deNodo.latitude, deNodo.longitude, infoCostumers[i].latitude, infoCostumers[i].longitude);
-        if (distTemp < d) {
+        double distTemp = haversineDist(aNodo.latitude, aNodo.longitude, infoCostumers[i].latitude, infoCostumers[i].longitude);
+        if (distTemp < d && infoCostumers[i].visited != 1)  {
             d = distTemp;
             nodoMenorDistancia = infoCostumers[i];
             indiceMenorDistancia = i;
@@ -260,25 +271,56 @@ structNodoMenorDistancia clienteConMenorDistanciaA(nodo deNodo, nodo* infoCostum
     sprintf(retorno.nombreNodo, "%c%d", nodoMenorDistancia.nodeType,nodoMenorDistancia.nodeId);
 
     return retorno;
-
-
 }
 
-void greedyGVRP(solucionList* listaSolucion, nodo* infoCostumers, nodo* infoStations, int maxTime, int maxDistance, double vehicleSpeed, int serviceTimem, int refuelTime) {
+structNodoMenorDistancia estacionConMenorDistanciaA(nodo aNodo, nodo* infoStations) {
+    // Primero, visitaremos todas las estaciones y veremos cual es la estacion no visitado con la menor distancia posible
+    int indiceMenorDistancia;
+    nodo nodoMenorDistancia;
+    double d = 99999999.0; // inicializamos en una distancia muy grande 
+    // Iteramos sobre los clientes
+    for (size_t i = 0; i < tamStations; i++) {
+        double distTemp = haversineDist(aNodo.latitude, aNodo.longitude, infoStations[i].latitude, infoStations[i].longitude);
+        if (distTemp < d) {
+            d = distTemp;
+            nodoMenorDistancia = infoStations[i];
+            indiceMenorDistancia = i;
+        }
+    }
+    
+    // almacenamos en la estructura de retorno los valores obtenidos
+    structNodoMenorDistancia retorno;
+    retorno.distance = d;
+    retorno.indice = indiceMenorDistancia;
+    sprintf(retorno.nombreNodo, "%c%d", nodoMenorDistancia.nodeType,nodoMenorDistancia.nodeId);
+    printf("Menor distancia nodo: %s, %f\n", retorno.nombreNodo, retorno.distance);
+
+    return retorno;
+}
+
+double distanciaNodoADeposito(double latitudNodo, double longitudNodo) { // calcula una distancia de algun nodo al deposito.
+    return haversineDist(latitudDeposito, longitudDeposito, latitudNodo, longitudNodo);
+}
+
+void greedyGVRP(solucionList* listaSolucion, nodo* infoCostumers, nodo* infoStations, int maxTime, int maxDistance, double vehicleSpeed, int serviceTime, int refuelTime) {
     // se pasa primero como parámetro una lista vacía, entonces añadimos d0 por ser el nodo depósito inicial 
     insertarNodo(listaSolucion, "d0");
     // seteamos las variables iniciales
     nodo nodoActual = infoStations[0];
 
     int actualTime = 0;
-    int actualDistance = 0;
+    double actualDistance = 0;
     int actualEstanque = maxDistance;
 
-    nodo nodoVisitado; // variable para ir guardando los nodos a medida que vamos visitando
+    // nodo clienteVisitado; // variable para ir guardando los clientes a medida que vamos visitando
+    // nodo estacionVisitada; // variable para ir recorriendo las estaciones a medida que vamos visitando
+
+    int feasibleDistanceCliente; // variable para chequear si la distancia del cliente visitado + la distancia del cliente visitado al deposito no supera la del estanque
+    int feasibleDistanceEstacion; // variable para chequear si la distancia de la estacion visitada + la distancia de la estacion visitada al deposito no supera la del estanque
 
     int flag = 1; // booleano que hará que detengamos la iteración
 
-    while(flag) {
+    while (flag) {
         // visitar a un nodo que sea factible, es decir, que cumpla con todas las restricciones del problema (crear funcion que encuentre el nodo con menor distancia al nodoVisitado actual
         // para esto llamamos a la funcion clienteConMenorDistancia, que retorna la menor distancia del nodoActual a algun cliente
         structNodoMenorDistancia clienteMenorDistancia = clienteConMenorDistanciaA(nodoActual, infoCostumers);
@@ -287,9 +329,41 @@ void greedyGVRP(solucionList* listaSolucion, nodo* infoCostumers, nodo* infoStat
         // 1. Ver primero si tenemos combustible suficiente para ir al cliente y además volver al depósito, en caso de que no, debemos ir a una estacion de recarga
         // 2. Si se cumple lo anterior, debemos ver si nos da el tiempo para ir al cliente y además sumarle el tiempo que nos toma ir al depósito en caso de quedarse sin tiempo
         // 3. Si no se cumple, debemos chequear lo mismo que antes (ver el combustible suficiente y si nos da el tiempo) pero con alguna estación de recarga
+        feasibleDistanceCliente = clienteMenorDistancia.distance + distanciaNodoADeposito(infoCostumers[clienteMenorDistancia.indice].latitude, infoCostumers[clienteMenorDistancia.indice].longitude) + distanciaNodoADeposito(nodoActual.latitude, nodoActual.longitude);
+        if (feasibleDistanceCliente > actualEstanque) {
+            // si se excede la distancia factible, debemos ir a recargar combustible
+            // para poder recargar combustible, debemos obtener la estacion con la menor distancia posible, se hace análogo a como se hizo con el cliente
+            structNodoMenorDistancia estacionMenorDistancia = estacionConMenorDistanciaA(nodoActual, infoStations);
 
+            // realizamos lo mismo que antes pero con la distancia factible hacia una estacion
+            feasibleDistanceEstacion = estacionMenorDistancia.distance + distanciaNodoADeposito(infoStations[estacionMenorDistancia.indice].latitude, infoStations[estacionMenorDistancia.indice].longitude) +  distanciaNodoADeposito(nodoActual.latitude, nodoActual.longitude);
+            if (feasibleDistanceEstacion > actualEstanque) {
+                // nos tenemos que devolver al depósito si o si, no quedan mas opciones
+                actualDistance +=  distanciaNodoADeposito(nodoActual.latitude, nodoActual.longitude); // sumamos la distancia para devolvernos desde donde estamos hasta el deposito
+                actualTime += actualDistance/vehicleSpeed;
+                insertarNodo(listaSolucion, "d0");
+                printf("Distancia recorrida: %f\nTiempo utilizado: %d\n", actualDistance, actualTime);
+                flag = 0;
+            } else { // podemos ir a recargar a una estación entonces
+                // printf("%f\n",estacionMenorDistancia.distance);
+                actualDistance += estacionMenorDistancia.distance; // sumamos la distancia que llevamos recorrida la distancia a la estacion mas cercana
+                actualEstanque = maxDistance; // llenamos el estanque
+                actualTime += refuelTime;
+                insertarNodo(listaSolucion, estacionMenorDistancia.nombreNodo);
+                nodoActual = infoStations[estacionMenorDistancia.indice]; // ahora nodo actual es la estacion que visitamos
+            }
         
-        flag = 0;
+        } else { // no tenemos problemas de quedar sin combustible, entonces visitamos al cliente
+            //  printf("%f\n",clienteMenorDistancia.distance);
+            actualDistance += clienteMenorDistancia.distance;
+            // printf("%f\n",clienteMenorDistancia.distance);
+            actualEstanque -= clienteMenorDistancia.distance;
+            actualTime += serviceTime + actualDistance/vehicleSpeed;
+            // marcamos como visitado al cliente
+            infoCostumers[clienteMenorDistancia.indice].visited = 1;
+            insertarNodo(listaSolucion, clienteMenorDistancia.nombreNodo);
+            nodoActual = infoCostumers[clienteMenorDistancia.indice]; // ahora nodo actual es la estacion que visitamos
+        }
     }
 }
 
@@ -306,6 +380,9 @@ int main() {
 
     tamStations = parametros->numStations;
     tamCostumers = parametros->numCostumers;
+
+    latitudDeposito = infoStations[0].latitude;
+    longitudDeposito = infoStations[0].longitude;
     // mostrarInfoNodos(infoStations, parametros->numStations);
     // mostrarInfoNodos(infoCostumers, parametros->numCostumers);
     // printf("Distancia de Haversine: en km -> %.5f, en millas -> %.5f\n", d, d / 1.609344);
@@ -315,6 +392,7 @@ int main() {
     printf("El tamaño inicial de la lista es de: %d\n", listaSolucion->size);
     printf("Nodo inicial: %s\n", listaSolucion->head->nombreNodo);
 
+    mostrarLista(listaSolucion);
     fclose(fp);
     free(parametros);
     // para compilar: gcc GVRP.c -o a -Wall -lm (-lm por <math.h>), luego valgrind ./a

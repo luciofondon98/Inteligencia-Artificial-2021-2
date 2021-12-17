@@ -42,9 +42,10 @@ typedef struct solucionList { // estructura que contiene una lista enlazada de s
     solucionNode* head;
 } solucionList;
 
-typedef struct structNodoMenorDistancia { // esta estructura nos servirá para el retorno en la función nodoConMenorDistanciaA
+typedef struct structNodoMenorDistancia { // esta estructura nos servirá para el retoorno en las funciones de cliente y nodo nodoConMenorDistanciaA
     double distance; // tamaño de la lista
     char nombreNodo[3];
+    int indice;
 } structNodoMenorDistancia;
 
 // ---------------------------------------------------------------------------------------- //
@@ -237,28 +238,26 @@ double haversineDist(double th1, double ph1, double th2, double ph2) { // latitu
 	return asin(sqrt(dx * dx + dy * dy + dz * dz) / 2) * 2 * R;
 }
 
-structNodoMenorDistancia nodoConMenorDistanciaA(nodo deNodo, nodo* infoCostumers, nodo* infoStations, int actualEstanque) {
+structNodoMenorDistancia clienteConMenorDistanciaA(nodo deNodo, nodo* infoCostumers) {
     // Primero, visitaremos todos los clientes y veremos cual es el cliente no visitado con la menor distancia posible
+    int indiceMenorDistancia;
     nodo nodoMenorDistancia;
     double d = 99999999; // inicializamos en una distancia muy grande 
     // Iteramos sobre los clientes
     for (size_t i = 0; i < tamCostumers; i++) {
         double distTemp = haversineDist(deNodo.latitude, deNodo.longitude, infoCostumers[i].latitude, infoCostumers[i].longitude);
-        printf("%lf\n", distTemp);
         if (distTemp < d) {
             d = distTemp;
             nodoMenorDistancia = infoCostumers[i];
+            indiceMenorDistancia = i;
         }
     }
     
-    printf("%lf\n", d);
-    printf("%c%d\n", nodoMenorDistancia.nodeType, nodoMenorDistancia.nodeId);
-
+    // almacenamos en la estructura de retorno los valores obtenidos
     structNodoMenorDistancia retorno;
-    
     retorno.distance = d;
+    retorno.indice = indiceMenorDistancia;
     sprintf(retorno.nombreNodo, "%c%d", nodoMenorDistancia.nodeType,nodoMenorDistancia.nodeId);
-    // printf("%s xd\n", retorno.nombreNodo);
 
     return retorno;
 
@@ -270,9 +269,6 @@ void greedyGVRP(solucionList* listaSolucion, nodo* infoCostumers, nodo* infoStat
     insertarNodo(listaSolucion, "d0");
     // seteamos las variables iniciales
     nodo nodoActual = infoStations[0];
-    // printf("%d %c %lf %lf\n",
-    //         nodoActual.nodeId, nodoActual.nodeType, 
-    //         nodoActual.longitude,nodoActual.latitude);
 
     int actualTime = 0;
     int actualDistance = 0;
@@ -282,11 +278,19 @@ void greedyGVRP(solucionList* listaSolucion, nodo* infoCostumers, nodo* infoStat
 
     int flag = 1; // booleano que hará que detengamos la iteración
 
-    structNodoMenorDistancia a = nodoConMenorDistanciaA(nodoActual, infoCostumers, infoStations, actualEstanque);
-    // while(flag) {
-    //     // visitar a un nodo que sea factible, es decir, que cumpla con todas las restricciones del problema (crear funcion que encuentre el nodo con menor distancia al nodoVisitado actual
+    while(flag) {
+        // visitar a un nodo que sea factible, es decir, que cumpla con todas las restricciones del problema (crear funcion que encuentre el nodo con menor distancia al nodoVisitado actual
+        // para esto llamamos a la funcion clienteConMenorDistancia, que retorna la menor distancia del nodoActual a algun cliente
+        structNodoMenorDistancia clienteMenorDistancia = clienteConMenorDistanciaA(nodoActual, infoCostumers);
+
+        // ahora, debemos ver si la distancia anterior es factible
+        // 1. Ver primero si tenemos combustible suficiente para ir al cliente y además volver al depósito, en caso de que no, debemos ir a una estacion de recarga
+        // 2. Si se cumple lo anterior, debemos ver si nos da el tiempo para ir al cliente y además sumarle el tiempo que nos toma ir al depósito en caso de quedarse sin tiempo
+        // 3. Si no se cumple, debemos chequear lo mismo que antes (ver el combustible suficiente y si nos da el tiempo) pero con alguna estación de recarga
+
         
-    // }
+        flag = 0;
+    }
 }
 
 int main() {

@@ -37,10 +37,15 @@ typedef struct solucionNode {
     struct solucionNode* sig; 
 } solucionNode;
 
-typedef struct solucionList { // estructura que contiene 
+typedef struct solucionList { // estructura que contiene una lista enlazada de strings, que basicamente contiene la solución candidata
     int size; // tamaño de la lista
     solucionNode* head;
 } solucionList;
+
+typedef struct structNodoMenorDistancia { // esta estructura nos servirá para el retorno en la función nodoConMenorDistanciaA
+    double distance; // tamaño de la lista
+    char nombreNodo[3];
+} structNodoMenorDistancia;
 
 // ---------------------------------------------------------------------------------------- //
 
@@ -232,10 +237,56 @@ double haversineDist(double th1, double ph1, double th2, double ph2) { // latitu
 	return asin(sqrt(dx * dx + dy * dy + dz * dz) / 2) * 2 * R;
 }
 
-void greedyGVRP(solucionList* listaSolucion/*, nodo* infoCostumers, nodo* infoStations, int maxTime, int maxDistance, double vehicleSpeed, int serviceTimem, int refuelTime*/) {
+structNodoMenorDistancia nodoConMenorDistanciaA(nodo deNodo, nodo* infoCostumers, nodo* infoStations, int actualEstanque) {
+    // Primero, visitaremos todos los clientes y veremos cual es el cliente no visitado con la menor distancia posible
+    nodo nodoMenorDistancia;
+    double d = 99999999; // inicializamos en una distancia muy grande 
+    // Iteramos sobre los clientes
+    for (size_t i = 0; i < tamCostumers; i++) {
+        double distTemp = haversineDist(deNodo.latitude, deNodo.longitude, infoCostumers[i].latitude, infoCostumers[i].longitude);
+        printf("%lf\n", distTemp);
+        if (distTemp < d) {
+            d = distTemp;
+            nodoMenorDistancia = infoCostumers[i];
+        }
+    }
+    
+    printf("%lf\n", d);
+    printf("%c%d\n", nodoMenorDistancia.nodeType, nodoMenorDistancia.nodeId);
+
+    structNodoMenorDistancia retorno;
+    
+    retorno.distance = d;
+    sprintf(retorno.nombreNodo, "%c%d", nodoMenorDistancia.nodeType,nodoMenorDistancia.nodeId);
+    // printf("%s xd\n", retorno.nombreNodo);
+
+    return retorno;
+
+
+}
+
+void greedyGVRP(solucionList* listaSolucion, nodo* infoCostumers, nodo* infoStations, int maxTime, int maxDistance, double vehicleSpeed, int serviceTimem, int refuelTime) {
     // se pasa primero como parámetro una lista vacía, entonces añadimos d0 por ser el nodo depósito inicial 
     insertarNodo(listaSolucion, "d0");
-    // 
+    // seteamos las variables iniciales
+    nodo nodoActual = infoStations[0];
+    // printf("%d %c %lf %lf\n",
+    //         nodoActual.nodeId, nodoActual.nodeType, 
+    //         nodoActual.longitude,nodoActual.latitude);
+
+    int actualTime = 0;
+    int actualDistance = 0;
+    int actualEstanque = maxDistance;
+
+    nodo nodoVisitado; // variable para ir guardando los nodos a medida que vamos visitando
+
+    int flag = 1; // booleano que hará que detengamos la iteración
+
+    structNodoMenorDistancia a = nodoConMenorDistanciaA(nodoActual, infoCostumers, infoStations, actualEstanque);
+    // while(flag) {
+    //     // visitar a un nodo que sea factible, es decir, que cumpla con todas las restricciones del problema (crear funcion que encuentre el nodo con menor distancia al nodoVisitado actual
+        
+    // }
 }
 
 int main() {
@@ -249,12 +300,14 @@ int main() {
     nodo* infoStations = getInfoStations(fp, parametros->numStations);
     nodo* infoCostumers = getInfoCostumers(fp, parametros->numCostumers);
 
+    tamStations = parametros->numStations;
+    tamCostumers = parametros->numCostumers;
     // mostrarInfoNodos(infoStations, parametros->numStations);
     // mostrarInfoNodos(infoCostumers, parametros->numCostumers);
     // printf("Distancia de Haversine: en km -> %.5f, en millas -> %.5f\n", d, d / 1.609344);
 
     solucionList* listaSolucion = crearLista();
-    greedyGVRP(listaSolucion);
+    greedyGVRP(listaSolucion, infoCostumers, infoStations, parametros->maxTime, parametros->maxDistance, parametros->vehicleSpeed, parametros->serviceTime, parametros->refuelTime);
     printf("El tamaño inicial de la lista es de: %d\n", listaSolucion->size);
     printf("Nodo inicial: %s\n", listaSolucion->head->nombreNodo);
 

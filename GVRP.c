@@ -323,6 +323,64 @@ solucionNode* copiaArreglo(solucionNode* arreglo) {
     return copy;
 }
 
+nodo findNode(char* nombreNodo, nodo* infoCostumers, nodo* infoStations) { // encuentra al nodo por su nombre y lo retorna
+    char compararNombre[3];
+    if (strstr(nombreNodo, "c") !=  NULL) { // es cliente
+        for (int i = 0; i < tamCostumers; i++) {
+            sprintf(compararNombre, "%c%d", infoCostumers[i].nodeType,infoCostumers[i].nodeId);
+            if (strcmp(nombreNodo, compararNombre) == 0) {
+                return infoCostumers[i];
+            }
+        }
+    } else if (strstr(nombreNodo, "f") != NULL) { // es estacion
+        for (int i = 0; i < tamStations; i++) {
+            sprintf(compararNombre, "%c%d", infoStations[i].nodeType,infoStations[i].nodeId);
+            if (strcmp(nombreNodo, compararNombre) == 0) {
+                return infoStations[i];
+            }
+        }
+    }
+    // return;
+}
+
+int esSolucionFactible(solucionNode* solucionCandidata, nodo* infoCostumers, nodo* infoStations, int maxTime, int maxDistance, double vehicleSpeed, int serviceTime, int refuelTime) {
+    int tamArreglo = sizeof(solucionCandidata) / sizeof(solucionCandidata[0]);
+    char* nodoActual = solucionCandidata[0].nombreNodo;
+    
+    int actualTime = 0;
+    double actualDistance = 0;
+    int actualEstanque = maxDistance;
+    
+    for (int i = 1; i < tamArreglo; i++) {
+        char* nodoAVisitar = solucionCandidata[i].nombreNodo;  
+        nodo tempNodoActual  =  findNode(nodoAVisitar, infoCostumers, infoStations); 
+        nodo tempNodoVisitar = findNode(nodoAVisitar, infoCostumers, infoStations); 
+        // ahora hallamos distancia entre nodoActual y tempNodo
+        double feasibleDistancia = haversineDist(tempNodoActual.latitude, tempNodoActual.longitude, tempNodoVisitar.latitude, tempNodoVisitar.latitude);
+        int feasibleTime = tiempoEntreNodos(feasibleDistancia, vehicleSpeed);
+
+        // vemos si viola o no las restricciones
+        if (feasibleDistancia <= actualEstanque) {
+            if (feasibleTime + actualTime <= maxTime) { // entonces, podemos ir al cliente sin problema alguno
+                actualDistance += feasibleDistancia;
+                actualEstanque -= feasibleDistancia;
+                if (tempNodoVisitar.nodeType == 99) { // veo si es cliente, ascii c = 99
+                    actualTime += feasibleTime + serviceTime; 
+
+                } else if (tempNodoVisitar.nodeType == 102) { // veo si es estacion, ascii f = 102
+                    actualTime += feasibleTime + refuelTime; 
+                    actualDistance = maxDistance;
+
+                } else return 0;
+
+            } else return 0; // no es factible
+        }
+                
+    }
+
+    return 1; 
+}
+
 void vecindarioFactibleSolucion(solucionList* solucionGreedy) {
     // recorrer la lista, agregarlos a un arreglo de solucionList y luego swapear ese arreglo
     int tam = solucionGreedy->size;
@@ -361,6 +419,8 @@ void vecindarioFactibleSolucion(solucionList* solucionGreedy) {
         }       
         printf("\n"); 
     }
+    // ahora debemos ver la factibilidad de las soluciones con el swap
+    // esSolucionFactible
 }
 
 

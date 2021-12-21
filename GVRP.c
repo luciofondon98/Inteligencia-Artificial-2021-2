@@ -317,7 +317,7 @@ int tiempoEntreNodos(double distancia, double vehicleSpeed) {
 
 solucionNode* copiaArreglo(solucionNode* arreglo) {
     int tam = sizeof(arreglo) / sizeof(arreglo[0]);
-    solucionNode copy[tam];
+    solucionNode* copy = malloc(tam);
 
     for (int i = 0; i < tam; i++) strcpy(copy[i].nombreNodo,arreglo[i].nombreNodo);
     return copy;
@@ -332,7 +332,7 @@ void vecindarioFactibleSolucion(solucionList* solucionGreedy) {
     while (current != NULL){
         strcpy(arreglo[i].nombreNodo,current->nombreNodo);
         current = current->sig;
-        printf("%s\n", arreglo[i].nombreNodo);
+        // printf("%s\n", arreglo[i].nombreNodo);
         i++;
     }
 
@@ -348,9 +348,18 @@ void vecindarioFactibleSolucion(solucionList* solucionGreedy) {
             temp = arreglo[i];
             arreglo[i] = arreglo[i+1];
             arreglo[i+1] = temp;
-            printf("%s\n", arreglo[i].nombreNodo);
-            // matriz[i-1] = arreglo;
+            // printf("%s\n", arreglo[i].nombreNodo);
+            memcpy(matriz[i-1], arreglo, sizeof(matriz[i]));
+            // memcpy(arreglo, copyArreglo, sizeof(arreglo));
         }
+    }
+    printf("\n"); 
+
+    for (int i = 0; i < cantSwaps; i++) {
+        for (int j = 0; j < tam; j++) {
+            printf("%s\n", matriz[i][j].nombreNodo);
+        }       
+        printf("\n"); 
     }
 }
 

@@ -10,8 +10,11 @@ int tamCostumers; // variable global para mantener el tamaño del arreglo
 int tamStations; // variable global para mantener el tamaño del arreglo
 double latitudDeposito;
 double longitudDeposito;
+double distanciaArchivo;
 // ---------------------------------------------------------------------------------------- //
 
+char* nombreInstancia = "Instancias/AB101.dat";
+char* salidaInstanciaGreedy = "AB101Greedy.txt";
 
 // --------------------/* Structs para almacenar los datos */------------------------ //
 
@@ -45,17 +48,18 @@ typedef struct solucionList { // estructura que contiene una lista enlazada de s
     double distanciaSolucion;
 } solucionList;
 
+typedef struct solucionGreedy { // estructura que contiene una lista enlazada de strings, que basicamente contiene la solución candidata
+    char rutaSolucion[50];
+    double distanciaSolucion;
+    int timeSolucion;
+} solucionGreedy;
+
 typedef struct structNodoMenorDistancia { // esta estructura nos servirá para el retoorno en las funciones de cliente y nodo nodoConMenorDistanciaA
     double distance; // tamaño de la lista
     char nombreNodo[3];
     int indice;
 } structNodoMenorDistancia;
 
-typedef struct feasibleSolucionSA {
-    struct solucionNode* arregloSolucion;
-    double distanciaSolucionFactible;
-    int tiempoSolucionFactible;
-} feasibleSolucionSA;
 
 // ---------------------------------------------------------------------------------------- //
 
@@ -238,6 +242,7 @@ void mostrarLista(solucionList *Lista){
  			printf(" %s ",current->nombreNodo);
  			current = current->sig;
  		}
+        printf("]");
         printf("\n");
     }
 }
@@ -269,45 +274,54 @@ double haversineDist(double th1, double ph1, double th2, double ph2) { // latitu
 	return asin(sqrt(dx * dx + dy * dy + dz * dz) / 2) * 2 * R;
 }
 
+int tiempoEntreNodos(double distancia, double vehicleSpeed) {
+    return distancia/vehicleSpeed;
+}
+
 structNodoMenorDistancia clienteConMenorDistanciaA(nodo aNodo, nodo* infoCostumers) {
     // Primero, visitaremos todos los clientes y veremos cual es el cliente no visitado con la menor distancia posible
-    // int indiceMenorDistancia;
-    // nodo nodoMenorDistancia;
+    int indiceMenorDistancia;
+    nodo nodoMenorDistancia;
     double d = 99999999.0; // inicializamos en una distancia muy grande 
     // Iteramos sobre los clientes
-    // almacenamos en la estructura de retorno los valores obtenidos
-    structNodoMenorDistancia retorno;
     for (size_t i = 0; i < tamCostumers; i++) {
         double distTemp = haversineDist(aNodo.latitude, aNodo.longitude, infoCostumers[i].latitude, infoCostumers[i].longitude);
         if (distTemp < d && infoCostumers[i].visited != 1)  {
             d = distTemp;
-            // nodoMenorDistancia = infoCostumers[i];
-            retorno.distance = d;
-            retorno.indice = i;
-            sprintf(retorno.nombreNodo, "%c%d", infoCostumers[i].nodeType,infoCostumers[i].nodeId);
+            nodoMenorDistancia = infoCostumers[i];
+            indiceMenorDistancia = i;
         }
     }
-    // printf("Menor distancia nodo: %s, %f\n", retorno.nombreNodo, retorno.distance);
+    
+    // almacenamos en la estructura de retorno los valores obtenidos
+    structNodoMenorDistancia retorno;
+    retorno.distance = d;
+    retorno.indice = indiceMenorDistancia;
+    sprintf(retorno.nombreNodo, "%c%d", nodoMenorDistancia.nodeType,nodoMenorDistancia.nodeId);
 
     return retorno;
 }
 
 structNodoMenorDistancia estacionConMenorDistanciaA(nodo aNodo, nodo* infoStations) {
     // Primero, visitaremos todas las estaciones y veremos cual es la estacion no visitado con la menor distancia posible
-    // int indiceMenorDistancia;
-    // nodo nodoMenorDistancia;
+    int indiceMenorDistancia;
+    nodo nodoMenorDistancia;
     double d = 99999999.0; // inicializamos en una distancia muy grande 
     // Iteramos sobre los clientes
-    structNodoMenorDistancia retorno;
     for (size_t i = 1; i < tamStations; i++) {
         double distTemp = haversineDist(aNodo.latitude, aNodo.longitude, infoStations[i].latitude, infoStations[i].longitude);
         if (distTemp < d) {
             d = distTemp;
-            retorno.distance = d;
-            retorno.indice = i;
-            sprintf(retorno.nombreNodo, "%c%d", infoStations[i].nodeType,infoStations[i].nodeId);
+            nodoMenorDistancia = infoStations[i];
+            indiceMenorDistancia = i;
         }
     }
+    
+    // almacenamos en la estructura de retorno los valores obtenidos
+    structNodoMenorDistancia retorno;
+    retorno.distance = d;
+    retorno.indice = indiceMenorDistancia;
+    sprintf(retorno.nombreNodo, "%c%d", nodoMenorDistancia.nodeType,nodoMenorDistancia.nodeId);
     // printf("Menor distancia nodo: %s, %f\n", retorno.nombreNodo, retorno.distance);
 
     return retorno;
@@ -317,209 +331,57 @@ double distanciaNodoADeposito(double latitudNodo, double longitudNodo) { // calc
     return haversineDist(latitudDeposito, longitudDeposito, latitudNodo, longitudNodo);
 }
 
-int tiempoEntreNodos(double distancia, double vehicleSpeed) {
-    return distancia/vehicleSpeed;
-}
-
-solucionNode* copiaArreglo(solucionNode* arreglo) {
-    int tam = sizeof(arreglo) / sizeof(arreglo[0]);
-    solucionNode* copy = malloc(tam);
-
-    for (int i = 0; i < tam; i++) strcpy(copy[i].nombreNodo,arreglo[i].nombreNodo);
-    return copy;
-}
-
-nodo findNode(char* nombreNodo, nodo* infoCostumers, nodo* infoStations) { // encuentra al nodo por su nombre y lo retorna
-    char compararNombre[3];
-    if (strstr(nombreNodo, "c") !=  NULL) { // es cliente
-        // printf("%d\n", (strstr(nombreNodo, "c") !=  NULL));
-        for (int i = 0; i < tamCostumers; i++) {
-            sprintf(compararNombre, "%c%d", infoCostumers[i].nodeType,infoCostumers[i].nodeId);
-            if (strcmp(nombreNodo, compararNombre) == 0) {
-                return infoCostumers[i];
+void archivoSolucion(solucionList* listaSolucion, int maxTime) {
+    FILE* sol = fopen(salidaInstanciaGreedy, "a");
+    
+    if (sol == NULL)
+    {
+        puts("Couldn't open file or file already exists");
+        exit(0);
+    }
+    else
+    {   
+      	solucionNode* current = listaSolucion->head;
+ 		while (current != NULL && listaSolucion->timeSolucion < maxTime){
+            if(current->sig == NULL) {
+                fprintf(sol ,"%s",current->nombreNodo);
+                current = current->sig;
+            } else {
+                fprintf(sol ,"%s",current->nombreNodo);
+                fprintf(sol, "-");
+                current = current->sig;
             }
-        }
-    } else if (strstr(nombreNodo, "f") != NULL) { // es estacion
-        for (int i = 0; i < tamStations; i++) {
-            sprintf(compararNombre, "%c%d", infoStations[i].nodeType,infoStations[i].nodeId);
-            if (strcmp(nombreNodo, compararNombre) == 0) {
-                return infoStations[i];
-            }
+ 		}
+        if (listaSolucion->timeSolucion < maxTime) {
+            fprintf(sol, "\t%lf", listaSolucion->distanciaSolucion);
+            fprintf(sol, "\t%d", listaSolucion->timeSolucion);
+            fprintf(sol, "\n");
         }
     }
-    // return;
+    fclose(sol);
+    return 0;
 }
 
-feasibleSolucionSA esSolucionFactible(solucionNode* solucionCandidata,int tamArreglo ,nodo* infoCostumers, nodo* infoStations, int maxTime, int maxDistance, double vehicleSpeed, int serviceTime, int refuelTime) {
-    // int tamArreglo = sizeof(solucionCandidata) / sizeof(solucionCandidata[0]);
-    // printf("tamArreglo: %d", tamArreglo);
-    char* nodoActual = solucionCandidata[0].nombreNodo;
-    // printf("Nodo actual: %s", nodoActual);
-    
-    int actualTime = 0;
-    double actualDistance = 0;
-    double actualEstanque = maxDistance;
-    // problemas a arreglar:
-    // 1. no sabe la distancia del nodo d0 porque no lo encuentra en infoStations, debo hacerlo por separado, es decir, antes de empezar el for y luego de terminarlo
-    // -> solucion: iterar sobre todos menos el primer y el ultimo elemento del arreglo
-    
-    for (int i = 0; i < tamArreglo-1; i++) {
-        // printf("xd");
-        char* nodoAVisitar = solucionCandidata[i+1].nombreNodo;
-        // printf("aaaaa %s\n", nodoAVisitar); 
-        nodo tempNodoVisitar = findNode(nodoAVisitar, infoCostumers, infoStations); 
-        if (strcmp(nodoActual, "d0") == 0) {
-            double feasibleDistancia = distanciaNodoADeposito(tempNodoVisitar.latitude, tempNodoVisitar.longitude);
-            int feasibleTime = tiempoEntreNodos(feasibleDistancia, vehicleSpeed);
-            if (feasibleDistancia <= actualEstanque) {
-                if (feasibleTime + actualTime <= maxTime) { // entonces, podemos ir al cliente sin problema alguno
-                    actualDistance += feasibleDistancia;
-                    actualEstanque -= feasibleDistancia;
-                    if (tempNodoVisitar.nodeType == 99) { // veo si es cliente, ascii c = 99
-                        actualTime += feasibleTime + serviceTime; 
-                        nodoActual = nodoAVisitar;
-                    } else if (tempNodoVisitar.nodeType == 102) { // veo si es estacion, ascii f = 102
-                        actualTime += feasibleTime + refuelTime; 
-                        actualDistance = maxDistance;
-                        nodoActual = nodoAVisitar;
-                    } else {
-                        feasibleSolucionSA retorno;
-                        retorno.arregloSolucion = NULL;
-                        return retorno;
-                    };
-                // nodoActual = nodoAVisitar;
-                } else {
-                    feasibleSolucionSA retorno;
-                    retorno.arregloSolucion = NULL;
-                    return retorno;
-                }; // no es factible
-            }
-        } else {
-            nodo tempNodoActual  =  findNode(nodoActual, infoCostumers, infoStations); 
-            // printf("Nodo actual: %c%d\n", tempNodoActual.nodeType,tempNodoActual.nodeId);
-            // printf("Nodo a visitar: %c%d\n", tempNodoVisitar.nodeType,tempNodoVisitar.nodeId);
-
-            // ahora hallamos distancia entre nodoActual y tempNodo
-            
-            double feasibleDistancia = haversineDist(tempNodoActual.latitude, tempNodoActual.longitude, tempNodoVisitar.latitude, tempNodoVisitar.longitude);
-            int feasibleTime = tiempoEntreNodos(feasibleDistancia, vehicleSpeed);
-            // printf("Distancia factible: %lf\nActual estanque: %lf\n",feasibleDistancia, feasibleTime);
-            if (feasibleDistancia <= actualEstanque) {
-                if (feasibleTime + actualTime <= maxTime) { // entonces, podemos ir al cliente sin problema alguno
-                    actualDistance += feasibleDistancia;
-                    actualEstanque -= feasibleDistancia;
-                    if (tempNodoVisitar.nodeType == 99) { // veo si es cliente, ascii c = 99
-                        actualTime += feasibleTime + serviceTime; 
-                        nodoActual = nodoAVisitar;
-                    } else if (tempNodoVisitar.nodeType == 102) { // veo si es estacion, ascii f = 102
-                        actualTime += feasibleTime + refuelTime; 
-                        actualDistance = maxDistance;
-                        nodoActual = nodoAVisitar;
-                    } else {
-                        feasibleSolucionSA retorno;
-                        retorno.arregloSolucion = NULL;
-                        return retorno;
-                    }
-                // nodoActual = nodoAVisitar;
-                } else {
-                    feasibleSolucionSA retorno;
-                    retorno.arregloSolucion = NULL;
-                    return retorno;
-                }; // no es factible
-            }
-        }
-        
-        // vemos si viola o no las restricciones
-                
-    }
-    
-    if (actualTime > maxTime) {
-        feasibleSolucionSA retorno;
-        retorno.arregloSolucion = NULL;
-        return retorno;
-    }
-    else {
-        // printf("Distancia recorrida: %lf", actualDistance);
-        feasibleSolucionSA retorno;
-        retorno.arregloSolucion = solucionCandidata;
-        retorno.distanciaSolucionFactible = actualDistance;
-        retorno.tiempoSolucionFactible = actualTime;
-        return retorno;
-    }
-}
-
-feasibleSolucionSA* vecindarioFactibleSolucion(solucionList* solucionGreedy, nodo* infoCostumers, nodo* infoStations, int maxTime, int maxDistance, double vehicleSpeed, int serviceTime, int refuelTime) {
-    // recorrer la lista, agregarlos a un arreglo de solucionList y luego swapear ese arreglo
-    int tam = solucionGreedy->size;
-    solucionNode arreglo[tam];
-    solucionNode* current = solucionGreedy->head;
-    int i = 0;
-    while (current != NULL){
-        strcpy(arreglo[i].nombreNodo,current->nombreNodo);
-        current = current->sig;
-        // printf("%s\n", arreglo[i].nombreNodo);
-        i++;
-    }
-
-    int cantSwaps = solucionGreedy->size - 3;
-
-    // ahora debemos swapear consecutivos y ver que al realizar el swap sea factible la solución
-    // int tamArreglo = sizeof(arreglo) / sizeof(arreglo[0]);
-    solucionNode matriz[cantSwaps][tam];
-    // solucionNode *copyArreglo = copiaArreglo(arreglo);
-    for (i = 1; i <= cantSwaps; i++){
-        if (strcmp(arreglo[i].nombreNodo,"d0") != 0) {
-            solucionNode temp;
-            temp = arreglo[i];
-            arreglo[i] = arreglo[i+1];
-            arreglo[i+1] = temp;
-            // printf("%s\n", arreglo[i].nombreNodo);
-            memcpy(matriz[i-1], arreglo, sizeof(matriz[i]));
-            // memcpy(arreglo, copyArreglo, sizeof(arreglo));
+int getCantLines() {
+    FILE* fp = fopen(salidaInstanciaGreedy, "r");
+    int lines = 0;
+    while(!feof(fp)) {
+        char ch = fgetc(fp);
+        if(ch == '\n') {
+            lines++;
         }
     }
-    // esto es para ver matriz
-    // printf("\n"); 
-
-    // for (int i = 0; i < cantSwaps; i++) {
-    //     for (int j = 0; j < tam; j++) {
-    //         printf("%s\n", matriz[i][j].nombreNodo);
-    //     }       
-    //     printf("\n"); 
-    // }
-    // ahora debemos ver la factibilidad de las soluciones con el swap
-
-    // int cantFactibles;
-    // for (int i = 0; i < cantSwaps; i++) {
-    //    if (esSolucionFactible(matriz[i],tam, infoCostumers, infoStations, maxTime, maxDistance, vehicleSpeed, serviceTime, refuelTime).arregloSolucion != NULL) {
-    //        cantFactibles+=1;
-    //    }
-    // }
-    // feasibleSolucionSA* arregloFactibles = (feasibleSolucionSA*)malloc(sizeof(feasibleSolucionSA) * cantFactibles);
-    // for (size_t i = 0; i < cantFactibles; i++)
-    // {   
-    //     feasibleSolucionSA fact = esSolucionFactible(matriz[i],tam, infoCostumers, infoStations, maxTime, maxDistance, vehicleSpeed, serviceTime, refuelTime);
-    //     if (fact.arregloSolucion != NULL) {
-    //         arregloFactibles[i] = fact;
-    //         printf("%lf\n", arregloFactibles->distanciaSolucionFactible);
-    //         // memcpy(arregloFactibles[i], fact, sizeof(arregloFactibles[i]));
-    //     }
-    // }
-    
-    // return arregloFactibles;
-
+    return lines;
 }
-
 
 void greedyGVRP(nodo* infoCostumers, nodo* infoStations, int maxTime, int maxDistance, double vehicleSpeed, int serviceTime, int refuelTime) {
     // se pasa primero como parámetro una lista vacía, entonces añadimos d0 por ser el nodo depósito inicial 
-
     double feasibleDistanceCliente; // variable para chequear si la distancia del cliente visitado + la distancia del cliente visitado al deposito no supera la del estanque
     double feasibleDistanceEstacion; // variable para chequear si la distancia de la estacion visitada + la distancia de la estacion visitada al deposito no supera la del estanque
 
     int feasibleTimeCliente; // variable para chequear factibilidad del tiempo demorado cliente
     int feasibleTimeEstacion; // variable para chequear factibilidad del tiempo demorado estacion
-    
+
     int clientesVisitados = 0;
     int autosUtilizados = 0;
     solucionList* listaSolucion = crearLista();
@@ -561,7 +423,7 @@ void greedyGVRP(nodo* infoCostumers, nodo* infoStations, int maxTime, int maxDis
                     insertarNodo(listaSolucion, "d0");
                     listaSolucion->distanciaSolucion = actualDistance;
                     listaSolucion->timeSolucion = actualTime;
-                    printf("Distancia recorrida: %f\nTiempo utilizado: %d\n", actualDistance, actualTime);
+                    // printf("Distancia recorrida: %f\nTiempo utilizado: %d\n", actualDistance, actualTime);
                     flag = 0;
                 }
             } else { // no nos pasamos del tiempo, pero debemos rellenar el estanque
@@ -598,7 +460,7 @@ void greedyGVRP(nodo* infoCostumers, nodo* infoStations, int maxTime, int maxDis
                         insertarNodo(listaSolucion, "d0");
                         listaSolucion->distanciaSolucion = actualDistance;
                         listaSolucion->timeSolucion = actualTime;
-                        printf("Distancia recorrida: %f\nTiempo utilizado: %d\n", actualDistance, actualTime);
+                        // printf("Distancia recorrida: %f\nTiempo utilizado: %d\n", actualDistance, actualTime);
                         flag = 0;
                     }
                 } else {
@@ -608,49 +470,140 @@ void greedyGVRP(nodo* infoCostumers, nodo* infoStations, int maxTime, int maxDis
                     insertarNodo(listaSolucion, "d0");
                     listaSolucion->distanciaSolucion = actualDistance;
                     listaSolucion->timeSolucion = actualTime;
-                    printf("Distancia recorrida: %f\nTiempo utilizado: %d\n", actualDistance, actualTime);
+                    // printf("Distancia recorrida: %f\nTiempo utilizado: %d\n", actualDistance, actualTime);
                     flag = 0;
                 }  
             }
         }
-    // acá hay q hacer simulated annealing
-    mostrarLista(listaSolucion);
-    vecindarioFactibleSolucion(listaSolucion, infoCostumers, infoStations, maxTime, maxDistance, vehicleSpeed, serviceTime, refuelTime);
-    borrarTodos(listaSolucion); 
-    break; // dsp sacar este break
+        archivoSolucion(listaSolucion, maxTime);
+        borrarTodos(listaSolucion); 
     }
-    
 }
 
+solucionGreedy* getSolucionGreedy() {
+    // leer archivo de la solucion del greedy
+    FILE* solGreedy = fopen(salidaInstanciaGreedy, "r");
+    int canLineas = getCantLines(); // cantLineas son la cantidad de autos utilizados en la solucion de la instancia
+    solucionGreedy* arregloSolGreedy = (solucionGreedy*)malloc(sizeof(solucionGreedy) * canLineas);
+    
+    char linea[1000];
 
+    for (size_t i = 0; i < canLineas; i++) {
+        fgets(linea, sizeof(linea), solGreedy); 
+        	// int init_size = strlen(str);
+        char delim[] = "\t";
 
-// void simullatedAnnealing(solucionList* solucionGreedy, int T, int T_min, int iter) {
-//     solucionList* S_best;
-//     solucionList* S_c = solucionGreedy;
-//     S_best = S_c;
-//     int t;
-//     // ciclo exterior, controlado por temperatura
-//     while (T > T_min) {
-//         t = 0;
-//         solucionList* S_n;
-//         // ciclo interior, controlado por iteraciones
-//         while (t < iter) {
-//             // Aca debemos realizar las operaciones en la solución para ver si es posible mejorarla
-//             // ver como hacer operaciones, calcular la calidad de la solucion (maxmimizar distancia), ver si la solucion luego de la operacion es factible
-//             // Sn se debe igualar y trabajar ciertas cosas con el, Sn guarda la solucion factible luego de la operacion
-//             // if evaluar(S_n, S_c) { // se ve cual solucion tiene mejor calidad, Sn > Sc?
-//             //     solucionList* S_c = S_n;
-//             // } else if
+        char *ptr = strtok(linea, delim);
+
+        int iterador = 0;
+        while (ptr != NULL) {   
+            if (iterador == 0) {
+                strcpy(arregloSolGreedy[i].rutaSolucion,ptr);
+                // printf("%s\n", ptr);
+                ptr = strtok(NULL, delim);
+            } else if (iterador == 1) {
+                arregloSolGreedy[i].distanciaSolucion = atof(ptr);
+                ptr = strtok(NULL, delim);
+
+            } else if (iterador == 2) {
+                arregloSolGreedy[i].timeSolucion = atoi(ptr);
+                ptr = strtok(NULL, delim);
+
+            }
+            iterador += 1;
+        }
+        printf("%s %lf %d\n",arregloSolGreedy[i].rutaSolucion,arregloSolGreedy[i].distanciaSolucion,arregloSolGreedy[i].timeSolucion);
+    }
+    return arregloSolGreedy;
+}
+
+int contarGuiones(char* sol) { // con cantidad de guiones puedo saber cuantos nodos hay en la solucion
+    char strRuta[50];
+
+    int cantGuiones = 0;
+    strcpy(strRuta, strtok(sol , " ")); // strRuta = d0-c37-c8-c9-c32-f7-c12-d0
+    for (int i = 0; i < strlen(strRuta); i++)
+    {
+        if (strRuta[i] == 45)  {
+            cantGuiones++;
+        }
+    }
+    return cantGuiones;
+}
+
+solucionNode* getArregloConNombresNodos(char* sol) {
+    char delim[] = "-";
+    int guiones = contarGuiones(sol);
+    
+    int tamArreglo = guiones + 1;
+    solucionNode* arreglo = (solucionNode*)malloc(sizeof(solucionNode)*tamArreglo);
+
+    // char *ptr = strtok(sol, delim);
+    strcpy(arreglo[0].nombreNodo,strtok(sol, delim));
+
+    for (size_t i = 1; i < tamArreglo; i++) {
+        strcpy(arreglo[i].nombreNodo,strtok(NULL, delim));
+    }
+    return arreglo;
+}
+
+// nodo findNode(char* nombreNodo, nodo* infoCostumers, nodo* infoStations) { // encuentra al nodo por su nombre y lo retorna
+//     char compararNombre[3];
+//     if (strstr(nombreNodo, "c") !=  NULL) { // es cliente
+//         // printf("%d\n", (strstr(nombreNodo, "c") !=  NULL));
+//         for (int i = 0; i < tamCostumers; i++) {
+//             sprintf(compararNombre, "%c%d", infoCostumers[i].nodeType,infoCostumers[i].nodeId);
+//             if (strcmp(nombreNodo, compararNombre) == 0) {
+//                 return infoCostumers[i];
+//             }
 //         }
-        
-//      }
+//     } else if (strstr(nombreNodo, "f") != NULL) { // es estacion
+//         for (int i = 0; i < tamStations; i++) {
+//             sprintf(compararNombre, "%c%d", infoStations[i].nodeType,infoStations[i].nodeId);
+//             if (strcmp(nombreNodo, compararNombre) == 0) {
+//                 return infoStations[i];
+//             }
+//         }
+//     }
 // }
 
+
+void vecindarioSolucionGreedy(solucionGreedy solGreedy) {
+    // int tamArregloSolGreedy = getCantLines();
+    int cantSwaps = contarGuiones(solGreedy.rutaSolucion) - 2;
+    int tam = contarGuiones(solGreedy.rutaSolucion) + 1; // tam es cantidad de nodos pertenecientes a la rutaSolucion -> d0-c37-c8-c9-c32-f7-c12-d0
+    solucionNode* arreglo = getArregloConNombresNodos(solGreedy.rutaSolucion);
+    
+    solucionNode matriz[cantSwaps][tam]; // cantSwaps = cantGuiones - 2
+    for (size_t i = 1; i <= cantSwaps; i++) {
+        if (strcmp(arreglo[i].nombreNodo,"d0") != 0) {
+            solucionNode temp;
+            temp = arreglo[i];
+            arreglo[i] = arreglo[i+1];
+            arreglo[i+1] = temp;
+            // printf("%s\n", arreglo[i].nombreNodo);
+            memcpy(matriz[i-1], arreglo, sizeof(matriz[i]));
+            // memcpy(arreglo, copyArreglo, sizeof(arreglo));
+        }
+    }
+    
+    
+    for (int i = 0; i < cantSwaps; i++) {
+        for (int j = 0; j < tam; j++) {
+            printf("%s\n", matriz[i][j].nombreNodo);
+        }       
+        printf("\n"); 
+    }
+    // ahora debemos ver la factibilidad de las soluciones con el swap
+
+
+}
 
 int main() {
     instanceParams* parametros; // variable para almacenar los parametros
 
-    FILE *fp = fopen("Instancias/AB103.dat","r");
+
+    FILE *fp = fopen(nombreInstancia,"r");
     
     parametros = getParametros(fp);
     mostrarParametros(parametros);
@@ -663,9 +616,20 @@ int main() {
 
     latitudDeposito = infoStations[0].latitude;
     longitudDeposito = infoStations[0].longitude;
+    // mostrarInfoNodos(infoStations, parametros->numStations);
+    // mostrarInfoNodos(infoCostumers, parametros->numCostumers);
+    // printf("Distancia de Haversine: en km -> %.5f, en millas -> %.5f\n", d, d / 1.609344);
 
-    // solucionList* listaSolucion = crearLista();
-    greedyGVRP(infoCostumers, infoStations, parametros->maxTime, parametros->maxDistance, parametros->vehicleSpeed, parametros->serviceTime, parametros->refuelTime);
+    
+    // greedyGVRP(infoCostumers, infoStations, parametros->maxTime, parametros->maxDistance, parametros->vehicleSpeed, parametros->serviceTime, parametros->refuelTime);
+    // vecindarioFactibleSolucion();
+    // getSolucionGreedy();
+    solucionGreedy sol;
+    strcpy(sol.rutaSolucion, "d0-c37-c8-c9-c32-f7-c12-d0 280.981161 584");
+    vecindarioSolucionGreedy(sol);
+    // arreglarDatosGreedy(getSolucionGreedy());
+    // FILE *a = fopen(salidaInstanciaGreedy,"r");
+    // printf("%d\n", getCantLines());
 
     // printf("El tamaño inicial de la lista es de: %d\n", listaSolucion->size);
     // printf("Nodo inicial: %s\n", listaSolucion->head->nombreNodo);

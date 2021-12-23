@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <time.h>
 
 #define R 6729.56122941 // radio en metros, que son 4182.44949 millas (4182.44949 * 1.609)
 #define TO_RAD (3.1415926536 / 180)
@@ -15,6 +16,7 @@ double distanciaArchivo;
 
 char* nombreInstancia = "Instancias/AB101.dat";
 char* salidaInstanciaGreedy = "AB101Greedy.txt";
+char* salidaInstanciaSA = "AB101Final.txt";
 
 // --------------------/* Structs para almacenar los datos */------------------------ //
 
@@ -331,7 +333,7 @@ double distanciaNodoADeposito(double latitudNodo, double longitudNodo) { // calc
     return haversineDist(latitudDeposito, longitudDeposito, latitudNodo, longitudNodo);
 }
 
-void archivoSolucion(solucionList* listaSolucion, int maxTime) {
+void archivoSolucionGreedy(solucionList* listaSolucion, int maxTime) {
     FILE* sol = fopen(salidaInstanciaGreedy, "a");
     
     if (sol == NULL)
@@ -362,6 +364,38 @@ void archivoSolucion(solucionList* listaSolucion, int maxTime) {
     return 0;
 }
 
+void archivoSolucionSA(solucionList* listaSolucion, int maxTime) {
+    FILE* sol = fopen(salidaInstanciaSA, "a");
+    
+    if (sol == NULL)
+    {
+        puts("Couldn't open file or file already exists");
+        exit(0);
+    }
+    else
+    {   
+      	solucionNode* current = listaSolucion->head;
+ 		while (current != NULL && listaSolucion->timeSolucion < maxTime){
+            if(current->sig == NULL) {
+                fprintf(sol ,"%s",current->nombreNodo);
+                current = current->sig;
+            } else {
+                fprintf(sol ,"%s",current->nombreNodo);
+                fprintf(sol, "-");
+                current = current->sig;
+            }
+ 		}
+        if (listaSolucion->timeSolucion < maxTime) {
+            fprintf(sol, "\t%lf", listaSolucion->distanciaSolucion);
+            fprintf(sol, "\t%d", listaSolucion->timeSolucion);
+            fprintf(sol, "\n");
+        }
+    }
+    fclose(sol);
+    return 0;
+}
+
+
 int getCantLines() {
     FILE* fp = fopen(salidaInstanciaGreedy, "r");
     int lines = 0;
@@ -383,7 +417,6 @@ void greedyGVRP(nodo* infoCostumers, nodo* infoStations, int maxTime, int maxDis
     int feasibleTimeEstacion; // variable para chequear factibilidad del tiempo demorado estacion
 
     int clientesVisitados = 0;
-    int autosUtilizados = 0;
     solucionList* listaSolucion = crearLista();
 
     // iteraremos hasta tener al menos 3/4 de los clientes visitados para la instancia
@@ -475,7 +508,7 @@ void greedyGVRP(nodo* infoCostumers, nodo* infoStations, int maxTime, int maxDis
                 }  
             }
         }
-        archivoSolucion(listaSolucion, maxTime);
+        archivoSolucionGreedy(listaSolucion, maxTime);
         borrarTodos(listaSolucion); 
     }
 }
@@ -512,7 +545,7 @@ solucionGreedy* getSolucionGreedy() {
             }
             iterador += 1;
         }
-        printf("%s %lf %d\n",arregloSolGreedy[i].rutaSolucion,arregloSolGreedy[i].distanciaSolucion,arregloSolGreedy[i].timeSolucion);
+        // printf("%s %lf %d\n",arregloSolGreedy[i].rutaSolucion,arregloSolGreedy[i].distanciaSolucion,arregloSolGreedy[i].timeSolucion);
     }
     return arregloSolGreedy;
 }
@@ -567,9 +600,7 @@ nodo findNode(char* nombreNodo, nodo* infoCostumers, nodo* infoStations) { // en
     }
 }
 
-
 int esSolucionFactible(solucionList* solucionCandidata, nodo* infoCostumers, nodo* infoStations, int maxTime, int maxDistance, double vehicleSpeed, int serviceTime, int refuelTime) {
-    int tamArreglo = solucionCandidata->size;
     solucionNode* nodoActual;
     solucionNode* nodoAVisitar;
     int actualTime = 0;
@@ -667,18 +698,65 @@ int esSolucionFactible(solucionList* solucionCandidata, nodo* infoCostumers, nod
     solucionCandidata->distanciaSolucion = actualDistance;
     solucionCandidata->timeSolucion = actualTime;
 
-    printf("Distancia sol con swap: %lf\nTime sol con swap: %d\n", solucionCandidata->distanciaSolucion, solucionCandidata->timeSolucion);
+    // printf("Distancia sol con swap: %lf\nTime sol con swap: %d\n", solucionCandidata->distanciaSolucion, solucionCandidata->timeSolucion);
 
     return 1; // es factible    
 
 }
+
+void simullatedAnnealing(solucionList* solucionGreedy, solucionList* solucionGreedySwap, int T, int T_min) {
+    srand(time(NULL));
+
+    solucionList* S_best;
+    solucionList* S_c = solucionGreedy;
+    printf("Distancia: %lf\nTiempo: %d", solucionGreedy->distanciaSolucion, solucionGreedy->timeSolucion);
+    S_best = S_c;
+    // ciclo exterior, controlado por temperatura
+    while (T > T_min) {
+        solucionList* S_n = solucionGreedySwap;
+        if (S_n->distanciaSolucion < S_c->distanciaSolucion) {
+            S_c = S_n;
+        } else {
+            double eval = S_n->distanciaSolucion - S_c->distanciaSolucion;
+            double exponente = eval/T;
+            double probAceptacion = exp(exponente);
+            
+            // aqui el random
+            double randomNumber;
+            randomNumber = rand() % 1000;
+            randomNumber /= 1000.0;
+
+            if (randomNumber < probAceptacion) {
+                S_c = S_n;
+            }
+        }
+        if (S_c->distanciaSolucion < S_best->distanciaSolucion) {
+            S_best = S_c;
+        }
+        T *= 0.8; // enfriamos la temperatura   
+    }
+    archivoSolucionSA(S_best, 660);
+}
+
 
 void vecindarioSolucionGreedy(solucionGreedy solGreedy, nodo* infoCostumers, nodo* infoStations, int maxTime, int maxDistance, double vehicleSpeed, int serviceTime, int refuelTime) {
     // int tamArregloSolGreedy = getCantLines();
     int cantSwaps = contarGuiones(solGreedy.rutaSolucion) - 2;
     int tam = contarGuiones(solGreedy.rutaSolucion) + 1; // tam es cantidad de nodos pertenecientes a la rutaSolucion -> d0-c37-c8-c9-c32-f7-c12-d0
     solucionNode* arreglo = getArregloConNombresNodos(solGreedy.rutaSolucion);
-    
+    solucionList* solOriginal = crearLista();
+
+    for (size_t i = 0; i < tam; i++) {
+        insertarNodo(solOriginal, arreglo[i].nombreNodo);
+    }
+
+    solOriginal->distanciaSolucion = solGreedy.distanciaSolucion;
+    solOriginal->timeSolucion = solGreedy.timeSolucion;
+    // printf("Distancia: %lf\nTiempo: %d", solOriginal->distanciaSolucion, solOriginal->timeSolucion);
+
+
+    // mostrarLista(solOriginal);
+
     solucionNode matriz[cantSwaps][tam]; // cantSwaps = cantGuiones - 2
     for (size_t i = 1; i <= cantSwaps; i++) {
         if (strcmp(arreglo[i].nombreNodo,"d0") != 0) {
@@ -691,19 +769,29 @@ void vecindarioSolucionGreedy(solucionGreedy solGreedy, nodo* infoCostumers, nod
     }
 
     for (int i = 0; i < cantSwaps; i++) {
-        solucionList* listaSolucion = crearLista();
+        solucionList* listaSolucion = crearLista(); // listaSolucion es la solucion con swap
         for (int j = 0; j < tam; j++) {
             insertarNodo(listaSolucion, matriz[i][j].nombreNodo);
 
         }
+        // mostrarLista(listaSolucion);
         // tengo la lista creada, ahora debo pasarla a una función para ver si la solución es factible
         
-        printf("%d\n",esSolucionFactible(listaSolucion, infoCostumers, infoStations, maxTime, maxDistance, vehicleSpeed, serviceTime, refuelTime));
+        // printf("%d\n",esSolucionFactible(listaSolucion, infoCostumers, infoStations, maxTime, maxDistance, vehicleSpeed, serviceTime, refuelTime));
+        if (esSolucionFactible(listaSolucion, infoCostumers, infoStations, maxTime, maxDistance, vehicleSpeed, serviceTime, refuelTime)) {
+            simullatedAnnealing(solOriginal, listaSolucion, 100, 10);
+        }
+        // ahora, se debe realizar el simullated annealing pasándole la solucion inicial y la solucion con el swap
     }
-    // ahora debemos ver la factibilidad de las soluciones con el swap
 }
 
 int main() {
+    if (remove(salidaInstanciaGreedy) == 0) {
+        printf("The file is deleted successfully.");
+    } else {
+        printf("The file is not deleted.");
+    }
+    
     instanceParams* parametros; // variable para almacenar los parametros
 
 
@@ -720,27 +808,27 @@ int main() {
 
     latitudDeposito = infoStations[0].latitude;
     longitudDeposito = infoStations[0].longitude;
-    // mostrarInfoNodos(infoStations, parametros->numStations);
-    // mostrarInfoNodos(infoCostumers, parametros->numCostumers);
-    // printf("Distancia de Haversine: en km -> %.5f, en millas -> %.5f\n", d, d / 1.609344);
-
     
-    // greedyGVRP(infoCostumers, infoStations, parametros->maxTime, parametros->maxDistance, parametros->vehicleSpeed, parametros->serviceTime, parametros->refuelTime);
+    greedyGVRP(infoCostumers, infoStations, parametros->maxTime, parametros->maxDistance, parametros->vehicleSpeed, parametros->serviceTime, parametros->refuelTime);
     // vecindarioFactibleSolucion();
-    // getSolucionGreedy();
-    solucionGreedy sol;
-    strcpy(sol.rutaSolucion, "d0-c37-c8-c9-c32-f7-c12-d0 280.981161 584");
-    vecindarioSolucionGreedy(sol, infoCostumers, infoStations, parametros->maxTime, parametros->maxDistance, parametros->vehicleSpeed, parametros->serviceTime, parametros->refuelTime);
-    // arreglarDatosGreedy(getSolucionGreedy());
+    solucionGreedy* arregloSoluciones =  getSolucionGreedy();
+    int cantAutos = getCantLines();
+
+    for (size_t i = 0; i < cantAutos; i++)  {
+        vecindarioSolucionGreedy(arregloSoluciones[i], infoCostumers, infoStations, parametros->maxTime, parametros->maxDistance, parametros->vehicleSpeed, parametros->serviceTime, parametros->refuelTime);
+
+    }
+    
+    // solucionGreedy sol;
+    // strcpy(sol.rutaSolucion, "d0-c37-c8-c9-c32-f7-c12-d0");
+    // sol.distanciaSolucion = 280.981161;
+    // sol.timeSolucion = 584;
+    // vecindarioSolucionGreedy(sol, infoCostumers, infoStations, parametros->maxTime, parametros->maxDistance, parametros->vehicleSpeed, parametros->serviceTime, parametros->refuelTime);
     // FILE *a = fopen(salidaInstanciaGreedy,"r");
     // printf("%d\n", getCantLines());
-
-    // printf("El tamaño inicial de la lista es de: %d\n", listaSolucion->size);
-    // printf("Nodo inicial: %s\n", listaSolucion->head->nombreNodo);
 
     fclose(fp);
     free(parametros);
     // para compilar: gcc GVRP.c -o a -Wall -lm (-lm por <math.h>), luego valgrind ./a
-    
     return 0;
 }

@@ -9,14 +9,18 @@
 
 int tamCostumers; // variable global para mantener el tamaño del arreglo de clientes
 int tamStations; // variable global para mantener el tamaño del arreglo de estaciones
-double latitudDeposito;
+double latitudDeposito; 
 double longitudDeposito;
 double distanciaArchivo;
+double distanciaTotalGreedy = 0.0;
+int tiempoTotalGreedy = 0;
+double distanciaTotalSA = 0.0;
+int tiempoTotalSA = 0;
 // ---------------------------------------------------------------------------------------- //
 
-char* nombreInstancia = "Instancias/AB219.dat";
-char* salidaInstanciaGreedy = "AB219Greedy.txt";
-char* salidaInstanciaSA = "AB219Final.txt";
+char* nombreInstancia = "Instancias/AB101.dat";
+char* salidaInstanciaGreedy = "AB101Greedy.txt";
+char* salidaInstanciaSA = "AB101Final.txt";
 
 // --------------------/* Structs para almacenar los datos */------------------------ //
 
@@ -336,6 +340,7 @@ double distanciaNodoADeposito(double latitudNodo, double longitudNodo) { // calc
     return haversineDist(latitudDeposito, longitudDeposito, latitudNodo, longitudNodo);
 }
 
+// Esta función crea el archivo de la solución de la instancia al utilizar el approach greedy
 void archivoSolucionGreedy(solucionList* listaSolucion, int maxTime) {
     FILE* sol = fopen(salidaInstanciaGreedy, "a");
     
@@ -361,11 +366,15 @@ void archivoSolucionGreedy(solucionList* listaSolucion, int maxTime) {
             fprintf(sol, "\t%lf", listaSolucion->distanciaSolucion);
             fprintf(sol, "\t%d", listaSolucion->timeSolucion);
             fprintf(sol, "\n");
+            tiempoTotalGreedy += listaSolucion->timeSolucion;
+            distanciaTotalGreedy += listaSolucion->distanciaSolucion;
         }
     }
+
     fclose(sol);
 }
 
+// Esta función crea el archivo de salida final de la instancia
 void archivoSolucionSA(solucionList* listaSolucion, int maxTime) {
     FILE* sol = fopen(salidaInstanciaSA, "a");
     
@@ -391,11 +400,12 @@ void archivoSolucionSA(solucionList* listaSolucion, int maxTime) {
             fprintf(sol, "\t%lf", listaSolucion->distanciaSolucion);
             fprintf(sol, "\t%d", listaSolucion->timeSolucion);
             fprintf(sol, "\n");
+            tiempoTotalSA += listaSolucion->timeSolucion;
+            distanciaTotalSA += listaSolucion->distanciaSolucion;
         }
     }
     fclose(sol);
 }
-
 
 int getCantLines() { // con esta función podemos obtener la cantidad de lineas del archivo solución del greedy, esto para saber la cantidad de autos y para manejar arreglos posteriores
     FILE* fp = fopen(salidaInstanciaGreedy, "r");
@@ -409,6 +419,7 @@ int getCantLines() { // con esta función podemos obtener la cantidad de lineas 
     return lines;
 }
 
+// Implementación de greedy 
 void greedyGVRP(nodo* infoCostumers, nodo* infoStations, int maxTime, int maxDistance, double vehicleSpeed, int serviceTime, int refuelTime) {
     double feasibleDistanceCliente; // variable para chequear si la distancia del cliente visitado + la distancia del cliente visitado al deposito no supera la del estanque
     double feasibleDistanceEstacion; // variable para chequear si la distancia de la estacion visitada + la distancia de la estacion visitada al deposito no supera la del estanque
@@ -422,7 +433,7 @@ void greedyGVRP(nodo* infoCostumers, nodo* infoStations, int maxTime, int maxDis
     // iteraremos hasta tener al menos 90% de los clientes visitados para la instancia
     // esto básicamente porque se llega a un punto en que es muy difícil hallar rutas en donde se tenga mas de un nodo
     // debido a que la mayoría de los nodos que están cercanos entre sí ya se visitaron en la primera ruta
-    while (clientesVisitados < 0.9*tamCostumers) {
+    while (clientesVisitados < 0.95*tamCostumers) {
         insertarNodo(listaSolucion, "d0");
         // seteamos las variables iniciales
         nodo nodoActual = infoStations[0];
@@ -507,6 +518,7 @@ void greedyGVRP(nodo* infoCostumers, nodo* infoStations, int maxTime, int maxDis
     }
 }
 
+// Esta función nos retorna un arreglo de structs de solucionGreedy del archivo txt de la solución inicial con greedy, para poder trabajar esas soluciones para el SA
 solucionGreedy* getSolucionGreedy() {
     // leer archivo de la solucion del greedy
     FILE* solGreedy = fopen(salidaInstanciaGreedy, "r");
@@ -545,7 +557,7 @@ int contarGuiones(char* sol) { // con cantidad de guiones puedo saber cuantos no
     char strRuta[50];
 
     int cantGuiones = 0;
-    strcpy(strRuta, strtok(sol , " ")); // strRuta = d0-c37-c8-c9-c32-f7-c12-d0
+    strcpy(strRuta, strtok(sol , " ")); // strRuta ejemplo -> d0-c37-c8-c9-c32-f7-c12-d0
     for (int i = 0; i < strlen(strRuta); i++)
     {
         if (strRuta[i] == 45)  {
@@ -555,6 +567,7 @@ int contarGuiones(char* sol) { // con cantidad de guiones puedo saber cuantos no
     return cantGuiones;
 }
 
+// Función auxiliar para tener el nombre de los nodos de la solución greedy
 solucionNode* getArregloConNombresNodos(char* sol) {
     char delim[] = "-";
     int guiones = contarGuiones(sol);
@@ -562,7 +575,6 @@ solucionNode* getArregloConNombresNodos(char* sol) {
     int tamArreglo = guiones + 1;
     solucionNode* arreglo = (solucionNode*)malloc(sizeof(solucionNode)*tamArreglo);
 
-    // char *ptr = strtok(sol, delim);
     strcpy(arreglo[0].nombreNodo,strtok(sol, delim));
 
     for (size_t i = 1; i < tamArreglo; i++) {
@@ -571,7 +583,8 @@ solucionNode* getArregloConNombresNodos(char* sol) {
     return arreglo;
 }
 
-nodo findNode(char* nombreNodo, nodo* infoCostumers, nodo* infoStations) { // encuentra al nodo por su nombre y lo retorna
+// Encuentra al nodo por su identificador y lo retorna, nos sirve para obtener latitudes y longitudes al momento de ver las soluciones factibles despues del swap
+nodo findNode(char* nombreNodo, nodo* infoCostumers, nodo* infoStations) { 
     char compararNombre[10];
     if (strstr(nombreNodo, "c") !=  NULL) { // es cliente
         for (int i = 0; i < tamCostumers; i++) {
@@ -593,6 +606,7 @@ nodo findNode(char* nombreNodo, nodo* infoCostumers, nodo* infoStations) { // en
     return dummy;
 }
 
+// Función que retorna un 1 si la solución candidata con el swap hecho es factible, 0 de lo contrario
 int esSolucionFactible(solucionList* solucionCandidata, nodo* infoCostumers, nodo* infoStations, int maxTime, int maxDistance, double vehicleSpeed, int serviceTime, int refuelTime) {
     solucionNode* nodoActual;
     solucionNode* nodoAVisitar;
@@ -682,11 +696,11 @@ int esSolucionFactible(solucionList* solucionCandidata, nodo* infoCostumers, nod
 
 }
 
+// Implementación de SA
 void simullatedAnnealing(solucionList* solucionGreedy, solucionList* solucionGreedySwap, int T, int T_min, int maxTime) {
     srand(time(NULL));
     solucionList* S_best;
     solucionList* S_c = solucionGreedy;
-    printf("Distancia: %lf\nTiempo: %d", solucionGreedy->distanciaSolucion, solucionGreedy->timeSolucion);
     S_best = S_c;
     while (T > T_min) {
         solucionList* S_n = solucionGreedySwap;
@@ -714,7 +728,7 @@ void simullatedAnnealing(solucionList* solucionGreedy, solucionList* solucionGre
     archivoSolucionSA(S_best, maxTime);
 }
 
-
+// En esta función obtenemos el vecindario de una solución inicial del greedy y desde acá llamamos a SA
 void vecindarioSolucionGreedy(solucionGreedy solGreedy, nodo* infoCostumers, nodo* infoStations, int maxTime, int maxDistance, double vehicleSpeed, int serviceTime, int refuelTime) {
     int cantSwaps = contarGuiones(solGreedy.rutaSolucion) - 2;
     int tam = contarGuiones(solGreedy.rutaSolucion) + 1; // tam es cantidad de nodos pertenecientes a la rutaSolucion -> d0-c37-c8-c9-c32-f7-c12-d0
@@ -742,7 +756,6 @@ void vecindarioSolucionGreedy(solucionGreedy solGreedy, nodo* infoCostumers, nod
             memcpy(matriz[i-1], arreglo, sizeof(matriz[i]));
         }
     }
-    // utiliza primera solución factible que encuentra en los swaps
     for (int i = 0; i < cantSwaps; i++) {
         solucionList* listaSolucion = crearLista(); // listaSolucion es la solucion con swap
         for (int j = 0; j < tam; j++) {
@@ -754,22 +767,25 @@ void vecindarioSolucionGreedy(solucionGreedy solGreedy, nodo* infoCostumers, nod
             break;
         } else {
             archivoSolucionSA(solOriginal, maxTime);
+            break;
         }
     borrarTodos(listaSolucion);
     } 
 }
 
 int main() {
+    clock_t begin = clock();
+
     if (remove(salidaInstanciaGreedy) == 0) {
-        printf("The file is deleted successfully.");
+        printf("The file is deleted successfully.\n");
     } else {
-        printf("The file is not deleted.");
+        printf("The file is not deleted\n.");
     }
 
     if (remove(salidaInstanciaSA) == 0) {
-        printf("The file is deleted successfully.");
+        printf("The file is deleted successfully.\n");
     } else {
-        printf("The file is not deleted.");
+        printf("The file is not deleted.\n");
     }
     
     instanceParams* parametros; // variable para almacenar los parametros
@@ -778,7 +794,6 @@ int main() {
     FILE *fp = fopen(nombreInstancia,"r");
     
     parametros = getParametros(fp);
-    mostrarParametros(parametros);
     
     nodo* infoStations = getInfoStations(fp, parametros->numStations);
     nodo* infoCostumers = getInfoCostumers(fp, parametros->numCostumers);
@@ -797,8 +812,24 @@ int main() {
         vecindarioSolucionGreedy(arregloSoluciones[i], infoCostumers, infoStations, parametros->maxTime, parametros->maxDistance, parametros->vehicleSpeed, parametros->serviceTime, parametros->refuelTime);
     }
 
+    FILE* solGreedy = fopen(salidaInstanciaGreedy, "a");
+    FILE* solSA = fopen(salidaInstanciaSA, "a");
+
+    fprintf(solGreedy, "Distancia total del recorrido: %lf\n", distanciaTotalSA);
+    fprintf(solGreedy, "Tiempo total del recorrido: %d\n", tiempoTotalSA);
+
+    fprintf(solSA, "Distancia total del recorrido: %lf\n", distanciaTotalGreedy);
+    fprintf(solSA, "Tiempo total del recorrido: %d\n", tiempoTotalGreedy);
+
     fclose(fp);
+    fclose(solGreedy);
+    fclose(solSA);
+
     free(parametros);
-    // para compilar: gcc GVRP.c -o a -Wall -lm (-lm por <math.h>), luego valgrind ./a
+    // para compilar: gcc GVRP.c -o a -Wall -lm (-lm por <math.h>)
+    
+    clock_t end = clock();
+    double time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
+    printf("Tiempo total de ejecución: %lf\n", time_spent);
     return 0;
 }
